@@ -6,5 +6,5 @@ dist/
 *.spec
 !WardogsMortar.spec
 artifacts/
+screenshots/
 *.log
-

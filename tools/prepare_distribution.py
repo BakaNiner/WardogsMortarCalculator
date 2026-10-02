@@ -18,8 +18,19 @@ with Image.open(root / "assets" / "icon.png") as image:
     image.save(root / "assets" / "icon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
 
 destination = root / "licenses" / "third_party"
+python_license = Path(sys.base_prefix) / "LICENSE.txt"
+if not python_license.is_file():
+    raise FileNotFoundError(f"Python license not found: {python_license}")
+shutil.copyfile(python_license, root / "licenses" / "Python-LICENSE.txt")
+locked_names = {
+    line.split("==", 1)[0].lower().replace("_", "-")
+    for line in (root / "requirements-lock.txt").read_text(encoding="utf-8").splitlines()
+    if "==" in line
+}
 for dist in metadata.distributions():
     name = dist.metadata["Name"]
+    if name.lower().replace("_", "-") not in locked_names:
+        continue
     target = destination / name
     for path in dist.files or []:
         parts = [part.lower() for part in path.parts]

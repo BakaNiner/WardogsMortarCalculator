@@ -8,6 +8,7 @@ import re
 import sys
 
 from PySide6.QtCore import QAbstractNativeEventFilter, QObject, Signal
+from .i18n import error_text, tr
 
 
 MOD_NOREPEAT = 0x4000
@@ -19,20 +20,20 @@ def parse_hotkey(text: str) -> tuple[int, int]:
     mods = 0
     for part in parts[:-1]:
         if part not in {"CTRL", "ALT", "SHIFT"}:
-            raise ValueError("快捷键支持 Ctrl、Alt、Shift 组合")
+            raise ValueError(tr("快捷键支持 Ctrl、Alt、Shift 组合"))
         bit = {"ALT": 1, "CTRL": 2, "SHIFT": 4}[part]
         if mods & bit:
-            raise ValueError("快捷键修饰键重复")
+            raise ValueError(tr("快捷键修饰键重复"))
         mods |= bit
     key = parts[-1]
     if key == "F12":
-        raise ValueError("F12 是 Windows 保留键，请选择其他快捷键")
+        raise ValueError(tr("F12 是 Windows 保留键，请选择其他快捷键"))
     if re.fullmatch(r"F(?:[1-9]|1[0-9]|2[0-4])", key):
         vk = 0x70 + int(key[1:]) - 1
     elif re.fullmatch(r"[A-Z0-9]", key) and mods:
         vk = ord(key)
     else:
-        raise ValueError("请使用 F1–F11、F13–F24，或 Ctrl/Alt/Shift + 字母/数字")
+        raise ValueError(tr("请使用 F1–F11、F13–F24，或 Ctrl/Alt/Shift + 字母/数字"))
     return mods | MOD_NOREPEAT, vk
 
 
@@ -78,14 +79,14 @@ class HotkeyManager(QAbstractNativeEventFilter):
             mods, vk = parse_hotkey(key)
             if sys.platform != "win32" or not USER32.RegisterHotKey(self.hwnd, index, mods, vk):
                 self.unregister()
-                raise ValueError(f"快捷键 {key} 注册失败，可能已被其他软件占用")
+                raise ValueError(tr("快捷键 {key} 注册失败，可能已被其他软件占用", key=key))
             self.ids[index] = role
         self.bindings = dict(bindings)
 
     def replace(self, bindings: dict[str, str]):
         parsed = [parse_hotkey(value) for value in bindings.values()]
         if len(set(parsed)) != len(parsed):
-            raise ValueError("炮位、目标、悬浮窗必须使用不同快捷键")
+            raise ValueError(tr("炮位、目标、悬浮窗必须使用不同快捷键"))
         old = self.bindings.copy()
         self.unregister()
         try:
@@ -94,7 +95,7 @@ class HotkeyManager(QAbstractNativeEventFilter):
             try:
                 self._register(old)
             except ValueError:
-                raise ValueError(f"{exc}；旧快捷键也无法恢复，请重新设置") from exc
+                raise ValueError(tr("{error}；旧快捷键也无法恢复，请重新设置", error=error_text(exc))) from exc
             raise
 
     def unregister(self):
@@ -111,4 +112,3 @@ class HotkeyManager(QAbstractNativeEventFilter):
                 self.signals.triggered.emit(self.ids[msg.wParam])
                 return True, 0
         return False, 0
-

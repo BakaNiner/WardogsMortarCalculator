@@ -6,6 +6,7 @@ from functools import lru_cache
 import json
 import math
 from pathlib import Path
+from .i18n import tr
 
 
 @dataclass(frozen=True)
@@ -15,7 +16,7 @@ class Point:
 
     def __post_init__(self):
         if not all(math.isfinite(n) for n in (self.x, self.y)):
-            raise ValueError("坐标必须是有限数字")
+            raise ValueError(tr("坐标必须是有限数字"))
 
     def label(self) -> str:
         return f"X {self.x:.2f}   Y {self.y:.2f}"
@@ -53,13 +54,13 @@ def calculate(origin: Point, target: Point) -> Solution:
     bearing = math.degrees(math.atan2(dx, dy)) % 360 if distance else None
     mil = elevation(distance)
     data = firing_data()
-    status = "射程内"
+    status = tr("射程内")
     if distance == 0:
-        status = "两点重合，方位角无定义"
+        status = tr("两点重合，方位角无定义")
     elif distance < data["min_range_m"] - 1e-6:
-        status = f"距离过近 · 最小 {data['min_range_m']} m"
+        status = tr("距离过近 · 最小 {distance} m", distance=data['min_range_m'])
     elif distance > data["max_range_m"] + 1e-6:
-        status = f"超出射程 · 最大 {data['max_range_m']} m"
+        status = tr("超出射程 · 最大 {distance} m", distance=data['max_range_m'])
     return Solution(distance, bearing, mil, status)
 
 

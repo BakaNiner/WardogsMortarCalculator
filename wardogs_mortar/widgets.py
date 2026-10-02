@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import cv2
 from PySide6.QtCore import QPoint, QRectF, Qt, Signal
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from .config import DEFAULT_ROI, Settings
 from .core import Point, Solution, bearing_text
+from .i18n import bind, tr
 from .win32 import exclude_from_capture
 
 
@@ -40,6 +42,10 @@ QLineEdit:focus, QKeySequenceEdit:focus { border-color: #c3e887; }
 QComboBox QAbstractItemView { background: #18241b; selection-background-color: #3b523c; }
 QToolTip { background: #26372a; color: #eef5e9; border: 1px solid #65845c; }
 QCheckBox { spacing: 8px; }
+QCheckBox::indicator { width: 20px; height: 20px; border: 2px solid #718775; border-radius: 5px; background: #101912; }
+QCheckBox::indicator:hover { border-color: #c3e887; }
+QCheckBox::indicator:checked { background: #c3e887; border-color: #c3e887; image: url("__CHECKMARK__"); }
+QCheckBox::indicator:checked:hover { background: #d5f5a4; border-color: #d5f5a4; }
 QSlider::groove:horizontal { background: #344a37; height: 5px; border-radius: 2px; }
 QSlider::handle:horizontal { background: #c3e887; width: 15px; margin: -5px 0; border-radius: 7px; }
 QStatusBar { color: #acb8ae; background: #111813; }
@@ -48,13 +54,20 @@ QScrollBar:vertical { background: #111813; width: 10px; }
 QScrollBar::handle:vertical { background: #435448; min-height: 24px; border-radius: 4px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
-"""
+""".replace("__CHECKMARK__", (Path(__file__).parent / "assets" / "check.svg").as_posix())
 
 
 def label(text: str, name: str = "") -> QLabel:
-    item = QLabel(text)
+    item = QLabel()
+    bind(item, "setText", text)
     if name:
         item.setObjectName(name)
+    return item
+
+
+def button(text: str = "") -> QPushButton:
+    item = QPushButton()
+    bind(item, "setText", text)
     return item
 
 
@@ -68,7 +81,7 @@ class Overlay(QWidget):
 
     def __init__(self):
         super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.WindowDoesNotAcceptFocus)
-        self.setWindowTitle("WARDOGS · 射击参数")
+        bind(self, "setWindowTitle", "WARDOGS · 射击参数")
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setStyleSheet(STYLE + "QWidget#overlay { background: #152019; border: 1px solid #62764d; border-radius: 10px; }")
         self.setObjectName("overlay")
@@ -98,14 +111,14 @@ class Overlay(QWidget):
 
     def update_solution(self, solution: Solution | None):
         if solution:
-            self.values[0].setText(bearing_text(solution.bearing))
-            self.values[1].setText(f"{solution.distance:.0f}")
-            self.values[2].setText(f"{solution.mil:.0f}" if solution.mil is not None else "—")
-            self.status.setText(solution.status + " · 平地射表")
+            bind(self.values[0], "setText", bearing_text(solution.bearing))
+            bind(self.values[1], "setText", f"{solution.distance:.0f}")
+            bind(self.values[2], "setText", f"{solution.mil:.0f}" if solution.mil is not None else "—")
+            bind(self.status, "setText", tr("{status} · 平地射表", status=solution.status))
         else:
             for value in self.values:
-                value.setText("—")
-            self.status.setText("等待炮位和目标坐标")
+                bind(value, "setText", "—")
+            bind(self.status, "setText", "等待炮位和目标坐标")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -123,8 +136,8 @@ class Overlay(QWidget):
 class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, displays: list[dict], parent=None):
         super().__init__(parent)
-        self.setWindowTitle("快捷键与显示设置")
-        self.setMinimumWidth(480)
+        bind(self, "setWindowTitle", "快捷键与显示设置")
+        self.setMinimumWidth(560)
         self.original = settings
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -136,31 +149,39 @@ class SettingsDialog(QDialog):
         for attr, caption in (("origin_hotkey", "记录炮位"), ("target_hotkey", "记录目标"), ("overlay_hotkey", "显示 / 隐藏悬浮窗")):
             edit = QKeySequenceEdit(QKeySequence(getattr(settings, attr)))
             edit.setMaximumSequenceLength(1)
-            edit.setAccessibleName(caption + "快捷键")
-            form.addRow(caption, edit)
+            bind(edit, "setAccessibleName", tr("{caption}快捷键", caption=tr(caption)))
+            form.addRow(tr(caption), edit)
             self.keys[attr] = edit
         self.monitor = QComboBox()
         for i, display in enumerate(displays, 1):
-            self.monitor.addItem(f"显示器 {i} · {display['width']} × {display['height']}", i)
+            self.monitor.addItem(tr("显示器 {index} · {width} × {height}", index=i, width=display['width'], height=display['height']), i)
         self.monitor.setCurrentIndex(max(0, min(settings.monitor-1, len(displays)-1)))
-        form.addRow("游戏显示器", self.monitor)
+        form.addRow(tr("游戏显示器"), self.monitor)
         self.opacity = QSlider(Qt.Orientation.Horizontal)
         self.opacity.setRange(35, 100)
         self.opacity.setValue(settings.overlay_opacity)
-        form.addRow("悬浮窗不透明度", self.opacity)
-        self.sound = QCheckBox("识别成功时播放提示音")
+        opacity_row = QHBoxLayout()
+        opacity_row.setSpacing(12)
+        opacity_row.addWidget(self.opacity, 1)
+        self.opacity_value = label(f"{settings.overlay_opacity}%")
+        self.opacity_value.setMinimumWidth(42)
+        self.opacity_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.opacity.valueChanged.connect(lambda value: bind(self.opacity_value, "setText", f"{value}%"))
+        opacity_row.addWidget(self.opacity_value)
+        form.addRow(tr("悬浮窗不透明度"), opacity_row)
+        self.sound = QCheckBox(tr("识别成功时播放提示音"))
         self.sound.setChecked(settings.sound)
         form.addRow(self.sound)
         layout.addLayout(form)
-        hint = label("支持功能键或 Ctrl / Alt / Shift 组合键。F12 为系统保留键。\n选择游戏中未占用的按键；更换显示器后请重新框选地图。", "muted")
+        hint = label("拖动滑块实时预览悬浮窗；取消后恢复原设置。\n支持功能键或 Ctrl / Alt / Shift 组合键，F12 为系统保留键。\n选择游戏中未占用的按键；更换显示器后请重新框选地图。", "muted")
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.error = label("", "error")
         self.error.setWordWrap(True)
         layout.addWidget(self.error)
         buttons = QDialogButtonBox()
-        buttons.addButton("保存", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttons.addButton("取消", QDialogButtonBox.ButtonRole.RejectRole)
+        buttons.addButton(tr("保存"), QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(tr("取消"), QDialogButtonBox.ButtonRole.RejectRole)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -216,7 +237,7 @@ class RegionCanvas(QWidget):
 class RegionDialog(QDialog):
     def __init__(self, image, roi, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("框选地图识别区域")
+        bind(self, "setWindowTitle", "框选地图识别区域")
         self.resize(1050, 750)
         layout = QVBoxLayout(self)
         layout.addWidget(label("拖动框选整个地图，让 X / Y 坐标在移动时始终落在框内。", "muted"))
@@ -225,10 +246,10 @@ class RegionDialog(QDialog):
         self.error = label("", "error")
         layout.addWidget(self.error)
         buttons = QDialogButtonBox()
-        reset = buttons.addButton("恢复默认区域", QDialogButtonBox.ButtonRole.ResetRole)
+        reset = buttons.addButton(tr("恢复默认区域"), QDialogButtonBox.ButtonRole.ResetRole)
         reset.clicked.connect(self.reset)
-        buttons.addButton("使用此区域", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttons.addButton("取消", QDialogButtonBox.ButtonRole.RejectRole)
+        buttons.addButton(tr("使用此区域"), QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(tr("取消"), QDialogButtonBox.ButtonRole.RejectRole)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -240,6 +261,6 @@ class RegionDialog(QDialog):
     def accept(self):
         from .config import valid_roi
         if not valid_roi(self.canvas.roi):
-            self.error.setText("区域过小，请框选整个地图。")
+            bind(self.error, "setText", "区域过小，请框选整个地图。")
             return
         super().accept()

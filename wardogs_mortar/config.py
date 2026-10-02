@@ -17,6 +17,7 @@ def data_dir() -> Path:
 
 @dataclass
 class Settings:
+    language: str = "zh_CN"
     origin_hotkey: str = "F1"
     target_hotkey: str = "F2"
     overlay_hotkey: str = "F3"
@@ -32,6 +33,8 @@ class Settings:
         try:
             raw = json.loads((data_dir() / "settings.json").read_text(encoding="utf-8"))
             obj = cls(**{k: v for k, v in raw.items() if k in cls.__dataclass_fields__})
+            if obj.language not in ("zh_CN", "en"):
+                obj.language = "zh_CN"
             if not isinstance(obj.monitor, int) or obj.monitor < 1:
                 raise ValueError("Invalid monitor")
             if not valid_roi(obj.roi):
@@ -60,4 +63,3 @@ def valid_roi(roi) -> bool:
         return all(isinstance(v, (float, int)) for v in roi) and 0 <= x < 1 and 0 <= y < 1 and w >= .03 and h >= .03 and x + w <= 1.000001 and y + h <= 1.000001
     except (ValueError, TypeError):
         return False
-

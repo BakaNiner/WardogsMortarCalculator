@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 
 from .core import Point
+from .i18n import tr
 
 
 COORDINATE = re.compile(r"(?<![a-z0-9])([xy])\s*[:=]?\s*(\d{1,3}[.,]\d{2})(?![\w.,])", re.I)
@@ -45,7 +46,7 @@ def extract_coordinates(regions: list[TextRegion], threshold: float = .80) -> tu
         for match in COORDINATE.finditer(text):
             axes[match[1].lower()].append((float(match[2].replace(",", ".")), region))
     if not axes["x"] or not axes["y"]:
-        raise RecognitionError("未找到完整且清晰的 X/Y 坐标。请打开地图，让坐标文字完整显示后重试。")
+        raise RecognitionError(tr("未找到完整且清晰的 X/Y 坐标。请打开地图，让坐标文字完整显示后重试。"))
     pairs = []
     for x, xr in axes["x"]:
         for y, yr in axes["y"]:
@@ -59,9 +60,9 @@ def extract_coordinates(regions: list[TextRegion], threshold: float = .80) -> tu
             pairs.append((Point(x, y), min(xr.score, yr.score)))
     unique = {p: score for p, score in pairs}
     if not unique:
-        raise RecognitionError("X/Y 文字位置不匹配，请重新框选地图区域。")
+        raise RecognitionError(tr("X/Y 文字位置不匹配，请重新框选地图区域。"))
     if len(unique) != 1:
-        raise RecognitionError("发现多组坐标，无法确定当前选点。请缩小识别区域后重试。")
+        raise RecognitionError(tr("发现多组坐标，无法确定当前选点。请缩小识别区域后重试。"))
     return next(iter(unique.items()))
 
 
@@ -73,7 +74,7 @@ class CoordinateReader:
         files = {"Det": "PP-OCRv6_det_small.onnx", "Rec": "PP-OCRv6_rec_small.onnx", "Cls": "ch_ppocr_mobile_v2.0_cls_mobile.onnx"}
         for filename in files.values():
             if not (models / filename).is_file():
-                raise RecognitionError("本地 OCR 模型缺失，请保留完整程序目录并重新解压。缺失文件：" + filename)
+                raise RecognitionError(tr("本地 OCR 模型缺失，请保留完整程序目录并重新解压。缺失文件：{filename}", filename=filename))
         self.engine = RapidOCR(params={
             "Global.log_level": "error",
             "EngineConfig.onnxruntime.intra_op_num_threads": 2,
@@ -84,9 +85,9 @@ class CoordinateReader:
     def read(self, image: np.ndarray) -> Recognition:
         start = time.perf_counter()
         if image is None or image.size == 0:
-            raise RecognitionError("截图为空，请检查显示器与识别区域")
+            raise RecognitionError(tr("截图为空，请检查显示器与识别区域"))
         if image.std() < 2:
-            raise RecognitionError("截图没有可识别内容，请尝试游戏无边框窗口模式")
+            raise RecognitionError(tr("截图没有可识别内容，请尝试游戏无边框窗口模式"))
         h, w = image.shape[:2]
         # Preserve small HUD text; the detector's own resizing is controlled below.
         scale = min(2.0, 1800 / max(h, w))
