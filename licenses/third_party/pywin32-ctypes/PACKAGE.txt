@@ -1,0 +1,3 @@
+pywin32-ctypes 0.2.3
+BSD-3-Clause
+https://github.com/enthought/pywin32-ctypes

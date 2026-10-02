@@ -1,0 +1,3 @@
+pefile 2024.8.26
+MIT
+https://github.com/erocarrera/pefile

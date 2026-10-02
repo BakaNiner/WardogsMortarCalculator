@@ -1,0 +1,3 @@
+pyclipper 1.4.0
+MIT
+https://github.com/fonttools/pyclipper

@@ -1,0 +1,3 @@
+six 1.17.0
+MIT
+https://github.com/benjaminp/six

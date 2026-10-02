@@ -1,0 +1,3 @@
+colorlog 6.12.0
+MIT License
+https://github.com/borntyping/python-colorlog

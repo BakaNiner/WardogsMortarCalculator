@@ -1,0 +1,3 @@
+altgraph 0.17.5
+MIT
+https://altgraph.readthedocs.io
